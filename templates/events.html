@@ -1,0 +1,109 @@
+<!-- templates/events.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Motion Events</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .events {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .event-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .event-card h3 {
+            margin: 0 0 10px 0;
+        }
+        .event-type {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+        .video {
+            background-color: #e3f2fd;
+            color: #1565c0;
+        }
+        .frames {
+            background-color: #f1f8e9;
+            color: #558b2f;
+        }
+        .logout {
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            text-decoration: none;
+        }
+        a {
+            text-decoration: none;
+            color: #1a73e8;
+        }
+        .view-link {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 6px 12px;
+            background: #1a73e8;
+            color: white;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Motion Events</h1>
+            <a href="{{ url_for('logout') }}" class="logout">Logout</a>
+        </div>
+        
+        <div class="events">
+            {% for event in events %}
+                <div class="event-card">
+                    <h3>{{ event.timestamp }}</h3>
+                    <span class="event-type {{ event.type }}">
+                        {% if event.type == 'video' %}
+                            Video Recording
+                        {% else %}
+                            {{ event.frame_count }} Frames
+                        {% endif %}
+                    </span>
+                    <div>
+                        {% if event.type == 'video' %}
+                            <a href="{{ url_for('serve_video', video_file=event.filename) }}" 
+                               class="view-link" target="_blank">
+                                View Video
+                            </a>
+                        {% else %}
+                            <a href="{{ url_for('view_frames', event_dir=event.filename) }}" 
+                               class="view-link">
+                                View Frames
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

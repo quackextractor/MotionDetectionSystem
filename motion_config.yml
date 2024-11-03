@@ -1,0 +1,8 @@
+camera:
+  fps: 20
+  resolution:
+    height: 360
+    width: 640
+motion_detection:
+  min_area: 2000
+  min_frames_for_video: 10
