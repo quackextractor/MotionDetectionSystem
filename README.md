@@ -24,6 +24,8 @@ project/
 │   └── server_config.yml
 ├── motion_images/
 ├── motion_videos/
+├── motion_detection.py
+├── web_server.py
 ├── logs/
 └── templates/
     ├── login.html
@@ -83,7 +85,7 @@ To stop the motion detection, press 'q' in the preview window.
 ### 2. Start Web Server
 
 ```bash
-python flask_server.py
+python web_server.py
 ```
 
 The server will:
@@ -103,7 +105,6 @@ The server will:
 - **Events Page**: Lists all captured motion events sorted by date/time
   - Video recordings
   - Image sequences
-- **Video Viewer**: Play recorded motion videos
 - **Frame Viewer**: Browse through image sequences frame by frame
 - **Logout**: End your session
 
@@ -116,7 +117,6 @@ The server will:
 ## Troubleshooting
 
 1. **No Events Showing**:
-   - Check that the motion detection script is running
    - Verify directory permissions
    - Check the motion detection logs
 
@@ -136,3 +136,14 @@ The motion detection can be adjusted by modifying these parameters:
 - `min_area`: Minimum pixel area to trigger motion detection
 - `min_frames_for_video`: Minimum frames needed to save as video
 - Resolution and FPS in the configuration file
+
+## Future Improvements
+- Database integration for event management
+- Push notifications for motion events
+- Motion zone configuration (openCV)
+- Event filtering and search at web interface
+- Add a message when no events are available
+- Add direct playback of recorded video clips
+- Add previews (thumbnails) to web server
+- Write proper docs using a template
+
