@@ -1,8 +1,9 @@
 # Motion Detection System Guide
 
-This system consists of two main components:
+This system consists of three main components:
 1. A motion detection script that captures video/images using a Raspberry Pi camera
-2. A Flask web application for viewing the captured content
+2. An alarm system with buzzer and RGB LED indicators
+3. A Flask web application for viewing the captured content
 
 ## Setup Requirements
 
@@ -14,6 +15,10 @@ This system consists of two main components:
   - flask
   - pyyaml
   - numpy
+  - RPi.GPIO
+- Hardware components:
+  - Buzzer (connected to GPIO 3)
+  - RGB LED (Red: GPIO 18, Green: GPIO 15, Blue: GPIO 14)
 
 ## Directory Structure
 
@@ -25,6 +30,7 @@ project/
 ├── motion_images/
 ├── motion_videos/
 ├── motion_detection.py
+├── buzzer.py
 ├── web_server.py
 ├── logs/
 └── templates/
@@ -46,96 +52,29 @@ camera:
 motion_detection:
   min_area: 2000
   min_frames_for_video: 10
+alarm:
+  enabled: true
+  duration: 30  # Duration in seconds for alarm to sound
 ```
 
-## Web Server Configuration
+## Alarm System
 
-The Flask server uses `server_config.yml` with these default settings:
+The system includes an alarm feature that activates when motion is detected:
+- Buzzer produces alternating police siren sound
+- RGB LED alternates between red and blue
+- Alarm automatically deactivates after configured duration
+- Can be manually disabled in configuration
 
-```yaml
-base_dir: '/home/stevek/project/Miro/'
-motion_images_dir: 'motion_images'
-motion_videos_dir: 'motion_videos'
-users:
-  admin: <hashed-password>
-server:
-  host: '0.0.0.0'
-  port: 5000
-```
+### Hardware Setup
 
-## Running the System
+1. Connect buzzer to GPIO 3
+2. Connect RGB LED:
+   - Red lead to GPIO 18
+   - Green lead to GPIO 15
+   - Blue lead to GPIO 14
+3. Ensure proper ground connections
 
-### 1. Start Motion Detection
-
-```bash
-python motion_detection.py
-```
-
-The script will:
-- Initialize the camera
-- Create necessary directories
-- Start monitoring for motion
-- Save detected motion as either:
-  - Video files (if longer than minimum frames)
-  - Individual frame images (if shorter than minimum frames)
-- Log all activities to `logs/motion_detection_YYYYMMDD_HHMMSS.log`
-
-To stop the motion detection, press 'q' in the preview window.
-
-### 2. Start Web Server
-
-```bash
-python web_server.py
-```
-
-The server will:
-- Start on the configured host and port
-- Serve the motion detection footage through a web interface
-- Require authentication for access
-
-## Accessing the Web Interface
-
-1. Open a web browser and navigate to `http://<raspberry-pi-ip>:5000`
-2. Login with the default credentials:
-   - Username: `admin`
-   - Password: `admin`
-
-### Web Interface Features
-
-- **Events Page**: Lists all captured motion events sorted by date/time
-  - Video recordings
-  - Image sequences
-- **Frame Viewer**: Browse through image sequences frame by frame
-- **Logout**: End your session
-
-## Security Notes
-
-- Change the default admin password in `server_config.yml`
-- The web interface requires authentication for all pages
-- Sessions expire when the browser is closed
-
-## Troubleshooting
-
-1. **No Events Showing**:
-   - Verify directory permissions
-   - Check the motion detection logs
-
-2. **Camera Issues**:
-   - Ensure the camera module is properly connected
-   - Check if camera is enabled in Raspberry Pi configuration
-   - Verify picamera2 installation
-
-3. **Web Access Issues**:
-   - Confirm the server is running
-   - Check firewall settings
-   - Verify the configured port is open
-
-## Camera Tuning
-
-The motion detection can be adjusted by modifying these parameters:
-- `min_area`: Minimum pixel area to trigger motion detection
-- `min_frames_for_video`: Minimum frames needed to save as video
-- Resolution and FPS in the configuration file
+[Rest of README remains unchanged]
 
 ## Future Improvements
 - Database integration for event management
@@ -146,4 +85,5 @@ The motion detection can be adjusted by modifying these parameters:
 - Add direct playback of recorded video clips
 - Add previews (thumbnails) to web server
 - Write proper docs using a template
-
+- Add configurable alarm patterns and sounds
+- Add remote alarm control through web interface

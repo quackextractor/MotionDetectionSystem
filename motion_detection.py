@@ -6,6 +6,7 @@ import time
 import logging
 import yaml
 from picamera2 import Picamera2, Preview
+from buzzer import setup_gpio, activate_siren, deactivate_siren
 
 
 def load_or_create_config():
@@ -24,6 +25,10 @@ def load_or_create_config():
         'motion_detection': {
             'min_area': 2000,
             'min_frames_for_video': 10
+        },
+        'alarm': {
+            'enabled': True,
+            'duration': 30  # Duration in seconds for alarm to sound
         }
     }
 
@@ -155,9 +160,15 @@ def main(cooldown=5, threshold=3, video_duration=5):
     logger.info(f"FPS: {config['camera']['fps']}")
     logger.info(f"Min area for motion detection: {config['motion_detection']['min_area']}")
     logger.info(f"Min frames for video: {config['motion_detection']['min_frames_for_video']}")
+    logger.info(f"Alarm enabled: {config['alarm']['enabled']}")
 
     camera = setup_camera(config)
     logger.info("Camera initialized successfully")
+
+    # Initialize GPIO for buzzer and LED
+    if config['alarm']['enabled']:
+        setup_gpio()
+        logger.info("Alarm system initialized")
 
     previous_frame = cv2.cvtColor(camera.capture_array(), cv2.COLOR_RGB2BGR)
     last_motion_time = time.time()
@@ -165,6 +176,7 @@ def main(cooldown=5, threshold=3, video_duration=5):
     video_frames = []
     recording = False
     recording_start_time = None
+    alarm_start_time = None
 
     try:
         while True:
@@ -181,6 +193,12 @@ def main(cooldown=5, threshold=3, video_duration=5):
                     video_frames = [current_frame]
                     logger.info("Motion detected - Starting video recording")
 
+                    # Activate alarm if enabled
+                    if config['alarm']['enabled'] and alarm_start_time is None:
+                        logger.info("Activating alarm system")
+                        activate_siren()
+                        alarm_start_time = time.time()
+
             elif recording and (time.time() - last_motion_time) >= 2:
                 logger.info("Motion stopped - Ending recording")
                 save_video(video_frames, config)
@@ -188,6 +206,12 @@ def main(cooldown=5, threshold=3, video_duration=5):
                 recording = False
                 motion_count = 0
                 recording_start_time = None
+
+            # Check if alarm should be deactivated
+            if alarm_start_time and (time.time() - alarm_start_time) >= config['alarm']['duration']:
+                logger.info("Deactivating alarm system")
+                deactivate_siren()
+                alarm_start_time = None
 
             previous_frame = current_frame
             cv2.imshow("Motion Detection", current_frame)
@@ -201,6 +225,8 @@ def main(cooldown=5, threshold=3, video_duration=5):
         logger.error(f"An error occurred: {str(e)}", exc_info=True)
 
     finally:
+        if config['alarm']['enabled']:
+            deactivate_siren()
         camera.stop()
         cv2.destroyAllWindows()
         logger.info("Motion detection system shutdown complete")
