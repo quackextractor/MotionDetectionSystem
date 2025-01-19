@@ -44,17 +44,23 @@ project/
 The motion detection script uses `motion_config.yml` with these default settings:
 
 ```yaml
-camera:
-  resolution:
-    width: 640
-    height: 360
-  fps: 20
-motion_detection:
-  min_area: 2000
-  min_frames_for_video: 10
-alarm:
-  enabled: true
-  duration: 3  # Duration in seconds for alarm to sound
+    default_config = {
+        'camera': {
+            'resolution': {
+                'width': 640,
+                'height': 360
+            },
+            'fps': 20
+        },
+        'motion_detection': {
+            'min_area': 2000,
+            'min_frames_for_video': 10
+        },
+        'alarm': {
+            'enabled': True,
+            'duration': 3
+        }
+    }
 ```
 
 ## Alarm System
