@@ -28,7 +28,7 @@ def load_or_create_config():
         },
         'alarm': {
             'enabled': True,
-            'duration': 30  # Duration in seconds for alarm to sound
+            'duration': 3  # Duration in seconds for alarm to sound
         }
     }
 
