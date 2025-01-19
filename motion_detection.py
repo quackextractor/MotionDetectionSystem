@@ -54,7 +54,7 @@ def load_or_create_config():
         },
         'alarm': {
             'enabled': True,
-            'duration': 30  # Duration in seconds for alarm to sound
+            'duration': 3
         }
     }
 
@@ -257,10 +257,10 @@ def main(cooldown=5, threshold=3, video_duration=5):
     finally:
         if config['alarm']['enabled']:
             deactivate_siren()
-        deactivate_night_light()  # Turn off night light when script ends
+        deactivate_night_light()
         camera.stop()
         cv2.destroyAllWindows()
-        GPIO.cleanup()  # Clean up all GPIO
+        GPIO.cleanup()
         logger.info("Motion detection system shutdown complete")
 
 
