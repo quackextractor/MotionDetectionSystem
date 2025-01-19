@@ -7,6 +7,32 @@ import logging
 import yaml
 from picamera2 import Picamera2, Preview
 from buzzer import setup_gpio, activate_siren, deactivate_siren
+import RPi.GPIO as GPIO
+
+# Add night light pin constant
+NIGHT_LIGHT_PIN = 7
+
+
+def setup_night_light():
+    """Setup GPIO pin for night light."""
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(NIGHT_LIGHT_PIN, GPIO.OUT)
+    logger = logging.getLogger('motion_detection')
+    logger.info("Night light initialized on PIN 7")
+
+
+def activate_night_light():
+    """Turn on the night light."""
+    GPIO.output(NIGHT_LIGHT_PIN, GPIO.HIGH)
+    logger = logging.getLogger('motion_detection')
+    logger.info("Night light activated")
+
+
+def deactivate_night_light():
+    """Turn off the night light."""
+    GPIO.output(NIGHT_LIGHT_PIN, GPIO.LOW)
+    logger = logging.getLogger('motion_detection')
+    logger.info("Night light deactivated")
 
 
 def load_or_create_config():
@@ -28,7 +54,7 @@ def load_or_create_config():
         },
         'alarm': {
             'enabled': True,
-            'duration': 3  # Duration in seconds for alarm to sound
+            'duration': 30  # Duration in seconds for alarm to sound
         }
     }
 
@@ -170,6 +196,10 @@ def main(cooldown=5, threshold=3, video_duration=5):
         setup_gpio()
         logger.info("Alarm system initialized")
 
+    # Initialize and activate night light
+    setup_night_light()
+    activate_night_light()
+
     previous_frame = cv2.cvtColor(camera.capture_array(), cv2.COLOR_RGB2BGR)
     last_motion_time = time.time()
     motion_count = 0
@@ -227,8 +257,10 @@ def main(cooldown=5, threshold=3, video_duration=5):
     finally:
         if config['alarm']['enabled']:
             deactivate_siren()
+        deactivate_night_light()  # Turn off night light when script ends
         camera.stop()
         cv2.destroyAllWindows()
+        GPIO.cleanup()  # Clean up all GPIO
         logger.info("Motion detection system shutdown complete")
 
 

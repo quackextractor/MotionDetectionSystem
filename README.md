@@ -54,7 +54,7 @@ motion_detection:
   min_frames_for_video: 10
 alarm:
   enabled: true
-  duration: 30  # Duration in seconds for alarm to sound
+  duration: 3  # Duration in seconds for alarm to sound
 ```
 
 ## Alarm System
@@ -65,16 +65,22 @@ The system includes an alarm feature that activates when motion is detected:
 - Alarm automatically deactivates after configured duration
 - Can be manually disabled in configuration
 
-### Hardware Setup
+### Night Light
+- Automatic activation when motion detection script starts
+- Provides constant illumination during operation
+- Automatically deactivates when script is stopped
+- Connected to GPIO 7
+
+## Hardware Setup
 
 1. Connect buzzer to GPIO 3
 2. Connect RGB LED:
    - Red lead to GPIO 18
    - Green lead to GPIO 15
    - Blue lead to GPIO 14
-3. Ensure proper ground connections
+3. Connect night light diode to GPIO 7
+4. Ensure proper ground connections
 
-[Rest of README remains unchanged]
 
 ## Future Improvements
 - Database integration for event management
