@@ -139,7 +139,7 @@ server:
 3. **Cleanup (reset all data):**
 
    ```bash
-   python3 BulbControl.py
+   ./cleanup.sh
    ```
 
    Bulb will turn on/off and log status.
