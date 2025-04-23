@@ -1,10 +1,10 @@
 # Motion Detection System Guide
 
-This system consists of three main components:
+This system consists of four main components:
 1. A motion detection script that captures video/images using a Raspberry Pi camera
 2. An alarm system with buzzer and RGB LED indicators
 3. A Flask web application for viewing the captured content
-
+4. A smart bulb that activates when motion is detected.
 ## Setup Requirements
 
 - Raspberry Pi with Camera Module V2
@@ -19,7 +19,7 @@ This system consists of three main components:
 - Hardware components:
   - Buzzer (connected to GPIO 3)
   - RGB LED (Red: GPIO 18, Green: GPIO 15, Blue: GPIO 14)
-
+  - smart bulb (TP Link)
 ## Directory Structure
 
 ```
@@ -30,6 +30,7 @@ project/
 ├── motion_images/
 ├── motion_videos/
 ├── motion_detection.py
+├── app.py
 ├── buzzer.py
 ├── web_server.py
 ├── logs/
@@ -44,23 +45,17 @@ project/
 The motion detection script uses `motion_config.yml` with these default settings:
 
 ```yaml
-    default_config = {
-        'camera': {
-            'resolution': {
-                'width': 640,
-                'height': 360
-            },
-            'fps': 20
-        },
-        'motion_detection': {
-            'min_area': 2000,
-            'min_frames_for_video': 10
-        },
-        'alarm': {
-            'enabled': True,
-            'duration': 3
-        }
-    }
+camera:
+  resolution:
+    width: 640
+    height: 360
+  fps: 20
+motion_detection:
+  min_area: 2000
+  min_frames_for_video: 10
+alarm:
+  enabled: true
+  duration: 3  # Duration in seconds for alarm to sound
 ```
 
 ## Alarm System
@@ -86,16 +81,3 @@ The system includes an alarm feature that activates when motion is detected:
    - Blue lead to GPIO 14
 3. Connect night light diode to GPIO 7
 4. Ensure proper ground connections
-
-
-## Future Improvements
-- Database integration for event management
-- Push notifications for motion events
-- Motion zone configuration (openCV)
-- Event filtering and search at web interface
-- Add a message when no events are available
-- Add direct playback of recorded video clips
-- Add previews (thumbnails) to web server
-- Write proper docs using a template
-- Add configurable alarm patterns and sounds
-- Add remote alarm control through web interface

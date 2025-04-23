@@ -1,171 +1,150 @@
-from flask import Flask, send_file, render_template, request, redirect, url_for, session
+
+import cv2
+import subprocess
+import numpy as np
+import datetime
 import os
-from functools import wraps
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime
-from pathlib import Path
+import time
+import logging
 import yaml
+from picamera2 import Picamera2
+from buzzer import setup_gpio, activate_siren, deactivate_siren
+import RPi.GPIO as GPIO
+import threading
 
-app = Flask(__name__)
-app.secret_key = os.urandom(24)
+# Night light pin
+NIGHT_LIGHT_PIN = 7
+shutdown_flag = threading.Event()
 
-def load_config():
-    """
-    Load configuration from YAML file or create default if not exists.
-    Returns the configuration dictionary.
-    """
-    BASE_DIR = '/home/stevek/project/Miro/'
-    CONFIG_PATH = os.path.join(BASE_DIR, 'config', 'server_config.yml')
-    
-    # Default configuration
+# --- GPIO & Light Setup ---
+def setup_night_light():
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(NIGHT_LIGHT_PIN, GPIO.OUT)
+    logging.getLogger('motion_detection').info("Night light initialized on PIN %d", NIGHT_LIGHT_PIN)
+
+def activate_night_light():
+    GPIO.output(NIGHT_LIGHT_PIN, GPIO.HIGH)
+    logging.getLogger('motion_detection').info("Night light activated")
+
+
+def deactivate_night_light():
+    GPIO.output(NIGHT_LIGHT_PIN, GPIO.LOW)
+    logging.getLogger('motion_detection').info("Night light deactivated")
+
+# --- Configuration ---
+def load_or_create_config():
+    config_dir = 'config'
+    config_path = os.path.join(config_dir, 'motion_config.yml')
     default_config = {
-        'base_dir': '/home/stevek/project/Miro/',
-        'motion_images_dir': 'motion_images',
-        'motion_videos_dir': 'motion_videos',
-        'users': {
-            'admin': generate_password_hash('admin')
-        },
-        'server': {
-            'host': '0.0.0.0',
-            'port': 5000
-        }
+        'camera': {'resolution': {'width': 640, 'height': 360}, 'fps': 20},
+        'motion_detection': {'min_area': 2000, 'min_frames_for_video': 10, 'threshold': 3},
+        'alarm': {'enabled': True, 'duration': 30}
     }
-    
-    # Create config directory if it doesn't exist
-    config_dir = os.path.dirname(CONFIG_PATH)
-    if not os.path.exists(config_dir):
-        os.makedirs(config_dir)
-    
-    # Try to load existing config, create default if not exists
+    os.makedirs(config_dir, exist_ok=True)
+    if not os.path.exists(config_path):
+        with open(config_path, 'w') as f:
+            yaml.dump(default_config, f)
+        return default_config
     try:
-        if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, 'r') as config_file:
-                config = yaml.safe_load(config_file)
-                if config is None:  # File exists but is empty
-                    config = default_config
-        else:
-            config = default_config
-            with open(CONFIG_PATH, 'w') as config_file:
-                yaml.dump(config, config_file, default_flow_style=False)
-    except Exception as e:
-        print(f"Error loading config: {e}")
-        config = default_config
-    
-    return config
+        with open(config_path) as f:
+            cfg = yaml.safe_load(f)
+            # ensure threshold exists
+            if 'threshold' not in cfg['motion_detection']:
+                cfg['motion_detection']['threshold'] = default_config['motion_detection']['threshold']
+            return cfg
+    except Exception:
+        return default_config
 
-# Load configuration
-config = load_config()
+# --- Logging ---
+def setup_logging():
+    os.makedirs('logs', exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    fname = f'logs/motion_{ts}.log'
+    logging.basicConfig(level=logging.INFO,
+                        format='%(asctime)s - %(levelname)s - %(message)s',
+                        handlers=[logging.FileHandler(fname), logging.StreamHandler()])
+    return logging.getLogger('motion_detection')
 
-# Set global variables from config
-BASE_DIR = config['base_dir']
-MOTION_IMAGES_DIR = os.path.join(BASE_DIR, config['motion_images_dir'])
-MOTION_VIDEOS_DIR = os.path.join(BASE_DIR, config['motion_videos_dir'])
-USERS = config['users']
+# --- Camera ---
+def setup_camera(cfg):
+    picam2 = Picamera2()
+    w, h = cfg['camera']['resolution']['width'], cfg['camera']['resolution']['height']
+    config = picam2.create_preview_configuration(main={"size": (w, h)})
+    picam2.configure(config)
+    picam2.start()
+    return picam2
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'username' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
+# --- Motion Detection ---
+def detect_motion(prev, cur, min_area):
+    g1 = cv2.cvtColor(prev, cv2.COLOR_BGR2GRAY)
+    g2 = cv2.cvtColor(cur, cv2.COLOR_BGR2GRAY)
+    g1 = cv2.GaussianBlur(g1, (21,21),0)
+    g2 = cv2.GaussianBlur(g2, (21,21),0)
+    delta = cv2.absdiff(g1, g2)
+    th = cv2.threshold(delta,25,255,cv2.THRESH_BINARY)[1]
+    th = cv2.dilate(th, None, iterations=2)
+    cnts,_ = cv2.findContours(th,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+    return any(cv2.contourArea(c)>min_area for c in cnts)
 
-def get_event_details(path):
-    """Extract timestamp from directory/file name and format it."""
-    try:
-        timestamp_str = path.split('_')[1].split('.')[0]
-        timestamp = datetime.strptime(timestamp_str, '%Y%m%d_%H%M%S')
-        return timestamp.strftime('%Y-%m-%d %H:%M:%S')
-    except:
-        return path
+# --- Saving ---
+def save_images(frames, start_time):
+    ts = start_time.strftime("%Y%m%d_%H%M%S")
+    base = 'motion_images'
+    dir_ = os.path.join(base, ts)
+    os.makedirs(dir_, exist_ok=True)
+    for i, f in enumerate(frames):
+        cv2.imwrite(f"{dir_}/frame_{i:03d}.jpg", f)
 
-@app.route('/')
-@login_required
-def index():
-    return redirect(url_for('events'))
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        
-        if username in USERS and check_password_hash(USERS[username], password):
-            session['username'] = username
-            return redirect(url_for('index'))
-        
-        return 'Invalid credentials', 401
-    
-    return render_template('login.html')
+def save_video(frames, cfg):
+    fps = cfg['camera']['fps']
+    if len(frames)<cfg['motion_detection']['min_frames_for_video']:
+        save_images(frames, datetime.datetime.now()); return
+    os.makedirs('motion_videos', exist_ok=True)
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    fname = f"motion_videos/motion_{ts}.avi"
+    h,w,_ = frames[0].shape
+    out = cv2.VideoWriter(fname, cv2.VideoWriter_fourcc(*'XVID'), fps, (w,h))
+    for f in frames: out.write(f)
+    out.release()
 
-@app.route('/logout')
-def logout():
-    session.pop('username', None)
-    return redirect(url_for('login'))
+# --- Main Loop ---
+def motion_loop():
+    logger = setup_logging()
+    cfg = load_or_create_config()
+    camera = setup_camera(cfg)
+    if cfg['alarm']['enabled']:
+        setup_gpio(); logger.info("Alarm initialized")
+    setup_night_light(); activate_night_light()
 
-@app.route('/events')
-@login_required
-def events():
-    events = []
-    
-    # Get video events
-    for video in sorted(os.listdir(MOTION_VIDEOS_DIR), reverse=True):
-        if video.endswith('.avi'):
-            timestamp = get_event_details(video)
-            events.append({
-                'timestamp': timestamp,
-                'type': 'video',
-                'filename': video,
-                'path': f'video/{video}'
-            })
-    
-    # Get image sequence events
-    for image_dir in sorted(os.listdir(MOTION_IMAGES_DIR), reverse=True):
-        dir_path = os.path.join(MOTION_IMAGES_DIR, image_dir)
-        if os.path.isdir(dir_path):
-            timestamp = get_event_details(image_dir)
-            frame_count = len([f for f in os.listdir(dir_path) if f.endswith('.jpg')])
-            events.append({
-                'timestamp': timestamp,
-                'type': 'frames',
-                'filename': image_dir,
-                'frame_count': frame_count,
-                'path': f'frames/{image_dir}'
-            })
-    
-    return render_template('events.html', events=events)
+    prev_frame = cv2.cvtColor(camera.capture_array(), cv2.COLOR_RGB2BGR)
+    frames, count, recording = [], 0, False
+    last_motion, alarm_start = time.time(), None
+    threshold = cfg['motion_detection']['threshold']
 
-@app.route('/frames/<path:event_dir>')
-@login_required
-def view_frames(event_dir):
-    dir_path = os.path.join(MOTION_IMAGES_DIR, event_dir)
-    if not os.path.exists(dir_path):
-        return 'Event not found', 404
-    
-    frames = sorted([f for f in os.listdir(dir_path) if f.endswith('.jpg')])
-    timestamp = get_event_details(event_dir)
-    
-    return render_template('frames.html',
-                         event_dir=event_dir,
-                         timestamp=timestamp,
-                         frames=frames)
+    while not shutdown_flag.is_set():
+        frame = cv2.cvtColor(camera.capture_array(), cv2.COLOR_RGB2BGR)
+        if detect_motion(prev_frame, frame, cfg['motion_detection']['min_area']):
+            count += 1; frames.append(frame); last_motion = time.time()
+            if not recording and count >= threshold:
+                recording = True; logger.info("Start recording")
+                frames = [frame]
+                if cfg['alarm']['enabled'] and alarm_start is None:
+                    activate_siren(); alarm_start = time.time()
+        elif recording and time.time() - last_motion >= 2:
+            logger.info("Stop recording"); save_video(frames, cfg)
+            frames, count, recording, alarm_start = [], 0, False, None
+        if alarm_start and time.time() - alarm_start >= cfg['alarm']['duration']:
+            deactivate_siren(); alarm_start = None
+        prev_frame = frame
+        time.sleep(1/cfg['camera']['fps'])
 
-@app.route('/frame/<path:event_dir>/<path:frame>')
-@login_required
-def serve_frame(event_dir, frame):
-    frame_path = os.path.join(MOTION_IMAGES_DIR, event_dir, frame)
-    if not os.path.exists(frame_path):
-        return 'Frame not found', 404
-    return send_file(frame_path)
-
-@app.route('/video/<path:video_file>')
-@login_required
-def serve_video(video_file):
-    video_path = os.path.join(MOTION_VIDEOS_DIR, video_file)
-    if not os.path.exists(video_path):
-        return 'Video not found', 404
-    return send_file(video_path)
+    # Cleanup
+    if cfg['alarm']['enabled']: deactivate_siren()
+    deactivate_night_light(); camera.stop(); GPIO.cleanup(); logger.info("Motion loop stopped")
 
 if __name__ == '__main__':
-    app.run(host=config['server']['host'], 
-            port=config['server']['port'])
+    try:
+        motion_loop()
+    except KeyboardInterrupt:
+        shutdown_flag.set()

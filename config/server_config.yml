@@ -1,0 +1,8 @@
+base_dir: /home/stevek/project/Miro/
+motion_images_dir: motion_images
+motion_videos_dir: motion_videos
+server:
+  host: 0.0.0.0
+  port: 8087
+users:
+  admin: pbkdf2:sha256:260000$DJKwSwRZRrBxhg38$b6ca8c71847fa004cf5298fd7d8957d2e0968726fd1ea4dfa9e1809572bd644a
