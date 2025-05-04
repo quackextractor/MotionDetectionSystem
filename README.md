@@ -154,14 +154,17 @@ Distributed under the MIT License. See `LICENSE` for details.
 
 ---
 
+
+## Project Development Documentation (Czech):
+[Dokumentace Fotopast](https://docs.google.com/document/d/1T_77nNW-4EIYlkuLjfPUxXBPPdTqFolsGkV9bxoDwQs/edit?usp=sharing)
+
+---
+
 ## Acknowledgments
 
 - [Picamera2](https://www.raspberrypi.com/documentation/accessories/camera.html)
 - [OpenCV Python](https://opencv.org/)
 - [Flask](https://flask.palletsprojects.com/)
 - [TP-Link Kasa API](https://github.com/python-kasa/python-kasa)
-
-## Project Development Documentation (Czech):
-[Dokumentace Fotopast](https://docs.google.com/document/d/1T_77nNW-4EIYlkuLjfPUxXBPPdTqFolsGkV9bxoDwQs/edit?usp=sharing)
 
 ****
